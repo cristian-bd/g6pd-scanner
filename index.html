@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>G6PD Scanner</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: white;
+            color: #333;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .header {
+            background: white;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 15px 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .back-btn {
+            position: absolute;
+            left: 15px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #007AFF;
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .container {
+            padding: 20px;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .camera-section {
+            margin-bottom: 30px;
+        }
+
+        .camera-container {
+            position: relative;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        #video {
+            width: 100%;
+            height: 250px;
+            object-fit: cover;
+        }
+
+        .camera-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        .scan-frame {
+            border: 2px solid white;
+            border-radius: 10px;
+            width: 200px;
+            height: 120px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background: #D1D1D6 !important;
+        }
+
+        .btn-primary {
+            background: #007AFF;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #0056CC;
+        }
+
+        .btn-success {
+            background: #34C759;
+            color: white;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background: #28A745;
+        }
+
+        .btn-secondary {
+            background: #8E8E93;
+            color: white;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #6D6D70;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 15px;
+            border: 1px solid #D1D1D6;
+            border-radius: 10px;
+            font-size: 16px;
+            background: white;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: #007AFF;
+            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+        }
+
+        .divider {
+            text-align: center;
+            margin: 20px 0;
+            color: #8E8E93;
+            font-weight: 500;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .alert-error {
+            background: #FFEBEE;
+            border: 1px solid #FFCDD2;
+            color: #C62828;
+        }
+
+        .alert-warning {
+            background: #FFF3E0;
+            border: 1px solid #FFCC02;
+            color: #E65100;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 20px;
+            color: #007AFF;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #E3F2FD;
+            border-top: 2px solid #007AFF;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .product-info {
+            margin-bottom: 30px;
+        }
+
+        .product-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .product-barcode {
+            color: #8E8E93;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .section {
+            margin-bottom: 25px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .section-content {
+            color: #666;
+            line-height: 1.5;
+        }
+
+        .allergen-item {
+            padding: 12px 15px;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            border: 1px solid;
+        }
+
+        .allergen-high {
+            background: #FFEBEE;
+            border-color: #FFCDD2;
+            color: #C62828;
+        }
+
+        .allergen-medium {
+            background: #FFFDE7;
+            border-color: #FFF176;
+            color: #F57F17;
+        }
+
+        .allergen-normal {
+            background: #F5F5F5;
+            border-color: #E0E0E0;
+            color: #424242;
+        }
+
+        .allergen-warning {
+            font-size: 12px;
+            margin-top: 5px;
+            font-weight: 500;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .camera-permission-denied {
+            text-align: center;
+            padding: 40px 20px;
+            background: #F8F8F8;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .header {
+                padding: 12px 15px;
+            }
+            
+            .btn {
+                padding: 12px 15px;
+                font-size: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <button class="back-btn hidden" id="backBtn" onclick="goBack()">←</button>
+        <h1>G6PD Scanner</h1>
+    </div>
+
+    <!-- Home Screen -->
+    <div id="homeScreen" class="container">
+        <!-- Camera Permission Alert -->
+        <div id="permissionAlert" class="alert alert-error hidden">
+            ⚠️ Accesso alla camera necessario per la scansione
+        </div>
+
+        <!-- Camera Section -->
+        <div class="camera-section">
+            <div id="cameraContainer" class="camera-container hidden">
+                <video id="video" autoplay playsinline muted></video>
+                <div class="camera-overlay">
+                    <div class="scan-frame"></div>
+                </div>
+            </div>
+
+            <div id="cameraButtons">
+                <button class="btn btn-primary" id="startCameraBtn" onclick="startCamera()">
+                    📷 Avvia Scanner Camera
+                </button>
+                <button class="btn btn-secondary hidden" id="stopCameraBtn" onclick="stopCamera()">
+                    ❌ Ferma Camera
+                </button>
+                <button class="btn btn-success hidden" id="simulateScanBtn" onclick="simulateScan()">
+                    🔍 Simula Scansione
+                </button>
+            </div>
+        </div>
+
+        <div class="divider">oppure</div>
+
+        <!-- Manual Input Section -->
+        <div class="input-group">
+            <label class="input-label">Inserisci codice a barre manualmente</label>
+            <input 
+                type="text" 
+                id="barcodeInput" 
+                class="input-field" 
+                placeholder="Inserisci numeri del codice a barre..."
+                onkeypress="handleKeyPress(event)"
+            >
+        </div>
+
+        <button class="btn btn-success" onclick="searchProduct()">
+            ⌨️ Cerca Prodotto
+        </button>
+
+        <!-- Loading -->
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <span>Ricerca prodotto in corso...</span>
+        </div>
+
+        <!-- Error Message -->
+        <div id="errorMessage" class="alert alert-error hidden"></div>
+    </div>
+
+    <!-- Product Screen -->
+    <div id="productScreen" class="container hidden">
+        <div class="product-info">
+            <div class="product-title" id="productName"></div>
+            <div class="product-barcode" id="productBarcode"></div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Descrizione</div>
+            <div class="section-content" id="productDescription"></div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Allergeni</div>
+            <div id="allergensList"></div>
+        </div>
+
+        <button class="btn btn-primary" onclick="goBack()">
+            🔍 Scansiona Altro Prodotto
+        </button>
+    </div>
+
+    <script>
+        let currentScreen = 'home';
+        let cameraStream = null;
+        let cameraPermissionGranted = false;
+
+        // Sample barcodes for testing
+        const sampleBarcodes = [
+            '8901030865820',
+            '8901050006509', 
+            '3017620422003',
+            '8076800195057',
+            '8000500037560'
+        ];
+
+        function showScreen(screenName) {
+            currentScreen = screenName;
+            document.getElementById('homeScreen').classList.toggle('hidden', screenName !== 'home');
+            document.getElementById('productScreen').classList.toggle('hidden', screenName !== 'product');
+            document.getElementById('backBtn').classList.toggle('hidden', screenName === 'home');
+        }
+
+        function goBack() {
+            showScreen('home');
+            stopCamera();
+            clearError();
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('errorMessage');
+            errorEl.textContent = message;
+            errorEl.classList.remove('hidden');
+        }
+
+        function clearError() {
+            document.getElementById('errorMessage').classList.add('hidden');
+        }
+
+        function showLoading(show = true) {
+            document.getElementById('loading').classList.toggle('hidden', !show);
+        }
+
+        async function startCamera() {
+            try {
+                clearError();
+                
+                cameraStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    } 
+                });
+                
+                const video = document.getElementById('video');
+                video.srcObject = cameraStream;
+                
+                cameraPermissionGranted = true;
+                document.getElementById('permissionAlert').classList.add('hidden');
+                document.getElementById('cameraContainer').classList.remove('hidden');
+                document.getElementById('startCameraBtn').classList.add('hidden');
+                document.getElementById('stopCameraBtn').classList.remove('hidden');
+                document.getElementById('simulateScanBtn').classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('Errore accesso camera:', error);
+                cameraPermissionGranted = false;
+                document.getElementById('permissionAlert').classList.remove('hidden');
+                showError('Impossibile accedere alla camera. Controlla i permessi del browser.');
+            }
+        }
+
+        function stopCamera() {
+            if (cameraStream) {
+                const tracks = cameraStream.getTracks();
+                tracks.forEach(track => track.stop());
+                cameraStream = null;
+            }
+            
+            const video = document.getElementById('video');
+            video.srcObject = null;
+            
+            document.getElementById('cameraContainer').classList.add('hidden');
+            document.getElementById('startCameraBtn').classList.remove('hidden');
+            document.getElementById('stopCameraBtn').classList.add('hidden');
+            document.getElementById('simulateScanBtn').classList.add('hidden');
+        }
+
+        function simulateScan() {
+            const randomBarcode = sampleBarcodes[Math.floor(Math.random() * sampleBarcodes.length)];
+            stopCamera();
+            searchProductByBarcode(randomBarcode);
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                searchProduct();
+            }
+        }
+
+        function searchProduct() {
+            const barcode = document.getElementById('barcodeInput').value.trim();
+            if (barcode) {
+                searchProductByBarcode(barcode);
+                document.getElementById('barcodeInput').value = '';
+            }
+        }
+
+        async function searchProductByBarcode(barcode) {
+            showLoading(true);
+            clearError();
+            
+            try {
+                const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+                const data = await response.json();
+                
+                if (data.status === 1 && data.product) {
+                    displayProduct(data.product, barcode);
+                } else {
+                    showError('Prodotto non trovato');
+                }
+            } catch (error) {
+                console.error('Errore ricerca:', error);
+                showError('Errore di rete. Controlla la connessione internet.');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function displayProduct(product, barcode) {
+            // Product name and barcode
+            document.getElementById('productName').textContent = product.product_name || 'Prodotto Sconosciuto';
+            document.getElementById('productBarcode').textContent = `Codice a barre: ${barcode}`;
+            
+            // Description
+            const description = getShortDescription(product);
+            document.getElementById('productDescription').textContent = description;
+            
+            // Allergens
+            const allergens = extractAllergens(product);
+            displayAllergens(allergens);
+            
+            showScreen('product');
+        }
+
+        function getShortDescription(product) {
+            const brand = product.brands || '';
+            const categories = product.categories || '';
+            const quantity = product.quantity || '';
+            
+            let description = '';
+            if (brand) description += brand + ' - ';
+            if (categories) {
+                const mainCategory = categories.split(',')[0].trim();
+                description += mainCategory;
+            }
+            if (quantity) description += ` (${quantity})`;
+            
+            return description || 'Nessuna descrizione disponibile';
+        }
+
+        function extractAllergens(product) {
+            const allergens = [];
+            const allergensText = (product.allergens || '').toLowerCase();
+            const mayContainText = (product.traces || '').toLowerCase();
+            const ingredientsText = (product.ingredients_text || '').toLowerCase();
+            
+            const allText = `${allergensText} ${mayContainText} ${ingredientsText}`;
+            
+            // Check for fava beans (red highlight)
+            const favaBeans = ['fava beans', 'fave', 'broad beans', 'favismo'];
+            const hasFavaBeans = favaBeans.some(term => allText.includes(term));
+            
+            if (hasFavaBeans) {
+                allergens.push({ text: 'Fave (fava beans)', priority: 'high' });
+            }
+            
+            // Check for peas, spelt, soy in main allergens (yellow highlight)
+            const yellowAllergens = ['peas', 'piselli', 'spelt', 'farro', 'soy', 'soia'];
+            yellowAllergens.forEach(allergen => {
+                if (allergensText.includes(allergen)) {
+                    const displayName = allergen === 'piselli' ? 'Piselli (peas)' : 
+                                       allergen === 'farro' ? 'Farro (spelt)' : 
+                                       allergen === 'soia' ? 'Soia (soy)' : allergen;
+                    allergens.push({ text: displayName, priority: 'medium' });
+                }
+            });
+            
+            // Add other allergens
+            if (product.allergens) {
+                const otherAllergens = product.allergens.split(',').map(a => a.trim()).filter(a => {
+                    const lower = a.toLowerCase();
+                    return !favaBeans.some(fb => lower.includes(fb)) && 
+                           !yellowAllergens.some(ya => lower.includes(ya));
+                });
+                
+                otherAllergens.forEach(allergen => {
+                    if (allergen) {
+                        allergens.push({ text: allergen, priority: 'normal' });
+                    }
+                });
+            }
+            
+            return allergens;
+        }
+
+        function displayAllergens(allergens) {
+            const container = document.getElementById('allergensList');
+            
+            if (allergens.length === 0) {
+                container.innerHTML = '<div style="color: #8E8E93; font-style: italic;">Nessuna informazione sugli allergeni disponibile</div>';
+                return;
+            }
+            
+            container.innerHTML = allergens.map(allergen => {
+                const className = allergen.priority === 'high' ? 'allergen-high' : 
+                                allergen.priority === 'medium' ? 'allergen-medium' : 'allergen-normal';
+                
+                let warning = '';
+                if (allergen.priority === 'high') {
+                    warning = '<div class="allergen-warning">⚠️ Alto rischio per deficit G6PD</div>';
+                } else if (allergen.priority === 'medium') {
+                    warning = '<div class="allergen-warning">⚠️ Rischio moderato per deficit G6PD</div>';
+                }
+                
+                return `<div class="allergen-item ${className}">
+                    <strong>${allergen.text}</strong>
+                    ${warning}
+                </div>`;
+            }).join('');
+        }
+
+        // Request camera permission on page load
+        window.addEventListener('load', function() {
+            // Check if camera is available
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showError('Camera non supportata su questo dispositivo');
+                document.getElementById('startCameraBtn').disabled = true;
+            }
+        });
+    </script>
+</body>
+</html>
