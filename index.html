@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>G6PD Scanner</title>
+    <!-- QuaggaJS per la scansione codici a barre -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -66,30 +68,37 @@
             margin-bottom: 15px;
         }
 
-        #video {
+        #scanner-container {
             width: 100%;
             height: 250px;
+            position: relative;
+        }
+
+        #scanner-container video {
+            width: 100%;
+            height: 100%;
             object-fit: cover;
         }
 
-        .camera-overlay {
+        #scanner-container canvas {
             position: absolute;
             top: 0;
             left: 0;
-            right: 0;
-            bottom: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            pointer-events: none;
         }
 
-        .scan-frame {
-            border: 2px solid white;
-            border-radius: 10px;
-            width: 200px;
-            height: 120px;
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.3);
+        .scan-line {
+            position: absolute;
+            top: 50%;
+            left: 10%;
+            right: 10%;
+            height: 2px;
+            background: #00ff00;
+            animation: scan 2s ease-in-out infinite;
+        }
+
+        @keyframes scan {
+            0%, 100% { opacity: 0.5; transform: translateY(-10px); }
+            50% { opacity: 1; transform: translateY(10px); }
         }
 
         .btn {
@@ -139,6 +148,15 @@
 
         .btn-secondary:hover:not(:disabled) {
             background: #6D6D70;
+        }
+
+        .btn-danger {
+            background: #FF3B30;
+            color: white;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: #D70015;
         }
 
         .input-group {
@@ -193,6 +211,12 @@
             background: #FFF3E0;
             border: 1px solid #FFCC02;
             color: #E65100;
+        }
+
+        .alert-success {
+            background: #E8F5E8;
+            border: 1px solid #4CAF50;
+            color: #2E7D32;
         }
 
         .loading {
@@ -286,12 +310,17 @@
             display: none;
         }
 
-        .camera-permission-denied {
-            text-align: center;
-            padding: 40px 20px;
-            background: #F8F8F8;
-            border-radius: 10px;
-            margin-bottom: 20px;
+        .scan-status {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            z-index: 10;
         }
 
         @media (max-width: 480px) {
@@ -319,28 +348,27 @@
 
     <!-- Home Screen -->
     <div id="homeScreen" class="container">
-        <!-- Camera Permission Alert -->
-        <div id="permissionAlert" class="alert alert-error hidden">
-            ⚠️ Accesso alla camera necessario per la scansione
+        <!-- Success Alert for scanned barcode -->
+        <div id="scanSuccessAlert" class="alert alert-success hidden">
+            ✅ <span id="scannedBarcodeText"></span>
         </div>
 
         <!-- Camera Section -->
         <div class="camera-section">
             <div id="cameraContainer" class="camera-container hidden">
-                <video id="video" autoplay playsinline muted></video>
-                <div class="camera-overlay">
-                    <div class="scan-frame"></div>
-                </div>
+                <div id="scanner-container"></div>
+                <div class="scan-line"></div>
+                <div class="scan-status" id="scanStatus">📷 Inquadra il codice a barre</div>
             </div>
 
             <div id="cameraButtons">
-                <button class="btn btn-primary" id="startCameraBtn" onclick="startCamera()">
+                <button class="btn btn-primary" id="startCameraBtn" onclick="startScanner()">
                     📷 Avvia Scanner Camera
                 </button>
-                <button class="btn btn-secondary hidden" id="stopCameraBtn" onclick="stopCamera()">
-                    ❌ Ferma Camera
+                <button class="btn btn-danger hidden" id="stopCameraBtn" onclick="stopScanner()">
+                    ❌ Ferma Scanner
                 </button>
-                <button class="btn btn-success hidden" id="simulateScanBtn" onclick="simulateScan()">
+                <button class="btn btn-success" id="simulateScanBtn" onclick="simulateScan()">
                     🔍 Simula Scansione
                 </button>
             </div>
@@ -398,8 +426,7 @@
 
     <script>
         let currentScreen = 'home';
-        let cameraStream = null;
-        let cameraPermissionGranted = false;
+        let isScanning = false;
 
         // Sample barcodes for testing
         const sampleBarcodes = [
@@ -419,8 +446,9 @@
 
         function goBack() {
             showScreen('home');
-            stopCamera();
+            stopScanner();
             clearError();
+            clearScanSuccess();
         }
 
         function showError(message) {
@@ -433,60 +461,138 @@
             document.getElementById('errorMessage').classList.add('hidden');
         }
 
+        function showScanSuccess(barcode) {
+            const alertEl = document.getElementById('scanSuccessAlert');
+            const textEl = document.getElementById('scannedBarcodeText');
+            textEl.textContent = `Codice scansionato: ${barcode}`;
+            alertEl.classList.remove('hidden');
+            setTimeout(() => {
+                alertEl.classList.add('hidden');
+            }, 3000);
+        }
+
+        function clearScanSuccess() {
+            document.getElementById('scanSuccessAlert').classList.add('hidden');
+        }
+
         function showLoading(show = true) {
             document.getElementById('loading').classList.toggle('hidden', !show);
         }
 
-        async function startCamera() {
-            try {
-                clearError();
-                
-                cameraStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { 
-                        facingMode: 'environment',
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    } 
-                });
-                
-                const video = document.getElementById('video');
-                video.srcObject = cameraStream;
-                
-                cameraPermissionGranted = true;
-                document.getElementById('permissionAlert').classList.add('hidden');
-                document.getElementById('cameraContainer').classList.remove('hidden');
-                document.getElementById('startCameraBtn').classList.add('hidden');
-                document.getElementById('stopCameraBtn').classList.remove('hidden');
-                document.getElementById('simulateScanBtn').classList.remove('hidden');
-                
-            } catch (error) {
-                console.error('Errore accesso camera:', error);
-                cameraPermissionGranted = false;
-                document.getElementById('permissionAlert').classList.remove('hidden');
-                showError('Impossibile accedere alla camera. Controlla i permessi del browser.');
-            }
+        function updateScanStatus(message) {
+            document.getElementById('scanStatus').textContent = message;
         }
 
-        function stopCamera() {
-            if (cameraStream) {
-                const tracks = cameraStream.getTracks();
-                tracks.forEach(track => track.stop());
-                cameraStream = null;
+        function startScanner() {
+            const isSecureContext = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost';
+            
+            if (!isSecureContext) {
+                showError('❌ Scanner camera richiede HTTPS. Usa "Simula Scansione" o inserimento manuale per testare.');
+                return;
             }
-            
-            const video = document.getElementById('video');
-            video.srcObject = null;
-            
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showError('❌ Camera non supportata su questo browser/dispositivo.');
+                return;
+            }
+
+            clearError();
+            isScanning = true;
+
+            // Show scanner UI
+            document.getElementById('cameraContainer').classList.remove('hidden');
+            document.getElementById('startCameraBtn').classList.add('hidden');
+            document.getElementById('stopCameraBtn').classList.remove('hidden');
+            document.getElementById('simulateScanBtn').classList.add('hidden');
+
+            // Initialize QuaggaJS
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: document.querySelector('#scanner-container'),
+                    constraints: {
+                        width: 640,
+                        height: 480,
+                        facingMode: "environment"
+                    }
+                },
+                locator: {
+                    patchSize: "medium",
+                    halfSample: true
+                },
+                numOfWorkers: 2,
+                frequency: 10,
+                decoder: {
+                    readers: [
+                        "code_128_reader",
+                        "ean_reader",
+                        "ean_8_reader",
+                        "code_39_reader",
+                        "code_39_vin_reader",
+                        "codabar_reader",
+                        "upc_reader",
+                        "upc_e_reader"
+                    ]
+                },
+                locate: true
+            }, function(err) {
+                if (err) {
+                    console.error('Errore inizializzazione scanner:', err);
+                    showError('Errore nell\'inizializzare lo scanner: ' + err.message);
+                    stopScanner();
+                    return;
+                }
+                
+                console.log("Scanner inizializzato correttamente");
+                updateScanStatus('📷 Scanner attivo - inquadra il codice a barre');
+                Quagga.start();
+            });
+
+            // Listen for successful scans
+            Quagga.onDetected(function(data) {
+                const barcode = data.codeResult.code;
+                console.log('Codice a barre rilevato:', barcode);
+                
+                // Show success message
+                showScanSuccess(barcode);
+                updateScanStatus('✅ Codice rilevato: ' + barcode);
+                
+                // Stop scanner and search product
+                setTimeout(() => {
+                    stopScanner();
+                    searchProductByBarcode(barcode);
+                }, 1000);
+            });
+
+            // Listen for processing events
+            Quagga.onProcessed(function(result) {
+                if (result && result.codeResult) {
+                    updateScanStatus('🔍 Elaborazione in corso...');
+                } else {
+                    updateScanStatus('📷 Inquadra il codice a barre');
+                }
+            });
+        }
+
+        function stopScanner() {
+            if (isScanning) {
+                Quagga.stop();
+                isScanning = false;
+            }
+
             document.getElementById('cameraContainer').classList.add('hidden');
             document.getElementById('startCameraBtn').classList.remove('hidden');
             document.getElementById('stopCameraBtn').classList.add('hidden');
-            document.getElementById('simulateScanBtn').classList.add('hidden');
+            document.getElementById('simulateScanBtn').classList.remove('hidden');
         }
 
         function simulateScan() {
             const randomBarcode = sampleBarcodes[Math.floor(Math.random() * sampleBarcodes.length)];
-            stopCamera();
-            searchProductByBarcode(randomBarcode);
+            showScanSuccess(randomBarcode);
+            setTimeout(() => {
+                searchProductByBarcode(randomBarcode);
+            }, 1500);
         }
 
         function handleKeyPress(event) {
@@ -506,6 +612,7 @@
         async function searchProductByBarcode(barcode) {
             showLoading(true);
             clearError();
+            clearScanSuccess();
             
             try {
                 const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
@@ -627,12 +734,37 @@
             }).join('');
         }
 
-        // Request camera permission on page load
+        // Initialize app on page load
         window.addEventListener('load', function() {
-            // Check if camera is available
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                showError('Camera non supportata su questo dispositivo');
+            console.log('G6PD Scanner caricato');
+            
+            // Check if QuaggaJS loaded correctly
+            if (typeof Quagga === 'undefined') {
+                showError('❌ Errore nel caricamento della libreria di scansione. Usa solo l\'inserimento manuale.');
                 document.getElementById('startCameraBtn').disabled = true;
+                document.getElementById('startCameraBtn').textContent = '❌ Scanner non disponibile';
+                return;
+            }
+
+            const isSecureContext = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost';
+            const hasCameraSupport = navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+            
+            if (!isSecureContext) {
+                document.getElementById('startCameraBtn').disabled = true;
+                document.getElementById('startCameraBtn').textContent = '🔒 Scanner richiede HTTPS';
+                
+                // Show helpful message
+                const helpDiv = document.createElement('div');
+                helpDiv.className = 'alert alert-warning';
+                helpDiv.innerHTML = `
+                    💡 <strong>Per usare lo scanner camera:</strong><br>
+                    • Carica il file su GitHub Pages (HTTPS)<br>
+                    • Oppure usa "Inserimento manuale" o "Simula Scansione"
+                `;
+                document.getElementById('homeScreen').insertBefore(helpDiv, document.querySelector('.camera-section'));
+            } else if (!hasCameraSupport) {
+                document.getElementById('startCameraBtn').disabled = true;
+                document.getElementById('startCameraBtn').textContent = '❌ Camera non supportata';
             }
         });
     </script>
