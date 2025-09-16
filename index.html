@@ -596,17 +596,10 @@
         }
 
         function extractAllergens(product) {
-            const allergens = new Set();
+            const allergens = []; // 👈 array, non Set
 
-            // 1. Allergeni ufficiali dall'API
-            if (product.allergens) allergens.add(product.allergens);
-            if (product.allergens_from_ingredients) allergens.add(product.allergens_from_ingredients);
-            if (Array.isArray(product.allergens_hierarchy)) {
-                product.allergens_hierarchy.forEach(a => allergens.add(a));
-            }
             const allergensText = (product.allergens || '').toLowerCase();
             const mayContainText = (product.traces || '').toLowerCase();
-            // 2. Ingredienti (testo)
             const ingredientsText = [
                 product.ingredients_text,
                 product.ingredients_text_fr,
@@ -615,42 +608,43 @@
                 product.ingredients_text_with_allergens_fr,
                 product.ingredients_text_with_allergens_it
             ].filter(Boolean).join(" ").toLowerCase();
-            const allText = `${allergensText} ${mayContainText} ${ingredientsText}`;
-                        
 
-  
-            // fava beans (rosso)
+            const allText = `${allergensText} ${mayContainText} ${ingredientsText}`;
+
+            // Fava beans (rosso)
             const favaBeans = ['fava beans', 'fave', 'broad beans', 'favismo', 'fava'];
-            const hasFavaBeans = favaBeans.some(term => allText.includes(term));
-            if (hasFavaBeans) { 
+            if (favaBeans.some(term => allText.includes(term))) { 
                 allergens.push({ text: 'Fave (fava beans)', priority: 'high' }); 
             }
-            
-            // peas, farro, soia: check only in main allergens list
+
+            // Piselli, farro, soia (medio)
             const yellowAllergens = ['peas','piselli','spelt','farro','soy','soia'];
             yellowAllergens.forEach(allergen => {
                 if (allergensText.includes(allergen)) {
                     const displayName = allergen === 'piselli' ? 'Piselli (peas)' : 
-                                      allergen === 'farro' ? 'Farro (spelt)' : 
-                                      allergen === 'soia' ? 'Soia (soy)' : allergen;
+                                    allergen === 'farro' ? 'Farro (spelt)' : 
+                                    allergen === 'soia' ? 'Soia (soy)' : allergen;
                     allergens.push({ text: displayName, priority: 'medium' });
                 }
             });
-            
-            // other allergens (normal)
+
+            // Altri allergeni generici
             if (product.allergens) {
-                const otherAllergens = product.allergens.split(',').map(a => a.trim()).filter(a => {
-                    const lower = a.toLowerCase();
-                    return !favaBeans.some(fb => lower.includes(fb)) && 
-                           !yellowAllergens.some(ya => lower.includes(ya));
-                });
+                const otherAllergens = product.allergens.split(',')
+                    .map(a => a.trim())
+                    .filter(a => {
+                        const lower = a.toLowerCase();
+                        return !favaBeans.some(fb => lower.includes(fb)) && 
+                            !yellowAllergens.some(ya => lower.includes(ya));
+                    });
                 otherAllergens.forEach(allergen => {
                     if (allergen) allergens.push({ text: allergen, priority: 'normal' });
                 });
             }
+
             return allergens;
         }
-
+        
         function displayAllergens(allergens) {
             const container = document.getElementById('allergensList');
             if (allergens.length === 0) {
